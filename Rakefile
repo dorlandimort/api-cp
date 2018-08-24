@@ -43,42 +43,29 @@ namespace :sepomex do
       zip_file.extract('CPdescarga.txt', 'latest.csv') { true }
     end
 
-    puts 'Parsing Postal Codes'
-    csv_text = File.readlines('latest.csv', encoding: 'ISO-8859-1:UTF-8')[1..-1].join
-    csv = CSV.parse(csv_text, col_sep: '|', quote_char: '%', headers: :first_row, return_headers: true)
-    csv.delete('d_tipo_asenta')
-    csv.delete('c_estado')
-    csv.delete('d_CP')
-    csv.delete('c_oficina')
-    csv.delete('c_CP')
-    csv.delete('c_tipo_asenta')
-    csv.delete('c_mnpio')
-    csv.delete('c_mnpio')
-    csv.delete('id_asenta_cpcons')
-    csv.delete('d_zona')
-    csv.delete('c_cve_ciudad')
-    csv.delete('d_ciudad')
-
-    puts 'Inserting new Postal Codes'
-    old_logger = ActiveRecord::Base.logger
-    ActiveRecord::Base.logger = nil
-    count = 0
-    total = csv.count
-    csv.each do |row|
-      arg = {}
-      row_h = row.to_h
-      arg[:codigo_postal] = row_h['d_codigo']
-      arg[:colonia] = row_h['d_asenta']
-      arg[:municipio] = row_h['D_mnpio']
-      arg[:estado] = row_h['d_estado']
-      PostalCode.find_or_create_by(arg)
-      print "#{(100 * count) / total}% \r"
-      count += 1
+    cmd = 'tail -n +2 latest.csv > latest_temp.csv'
+    if system(cmd)
+      ActiveRecord::Base.logger = nil
+      CSV.foreach('latest_temp.csv', encoding: 'ISO-8859-1:UTF-8', col_sep: '|', quote_char: '%', headers: true).each do |row|
+        arg = {
+          codigo_postal: row['d_codigo'],
+          colonia: row['d_asenta'],
+          municipio: row['D_mnpio'],
+          estado: row['d_estado']
+        }
+        PostalCode.find_or_create_by(arg)
+        print "."
+      end
+    else
+      puts "fallo en comando"
     end
-    ActiveRecord::Base.logger = old_logger
     puts ''
     puts 'Removing TempFiles'
     File.delete('latest.csv')
+    File.delete('latest_temp.csv')
     File.delete('latest.zip')
+
+
+    
   end
 end
